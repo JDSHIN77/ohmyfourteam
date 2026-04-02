@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Personnel": {
+      "title": "Personnel",
+      "description": "Personnel information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "branch": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "branch", "name"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Work schedule for a person",
+      "type": "object",
+      "properties": {
+        "personId": { "type": "number" },
+        "data": { "type": "object" }
+      },
+      "required": ["personId", "data"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Board post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "managerName": { "type": "string" },
+        "date": { "type": "string" },
+        "scheduledWorkplace": { "type": "string" },
+        "changedWorkplace": { "type": "string" },
+        "supportTime": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "managerName", "date", "createdAt"]
+    }
+  },
+  "firestore": {
+    "personnel": {
+      "schema": "Personnel",
+      "description": "Collection of personnel"
+    },
+    "schedules": {
+      "schema": "Schedule",
+      "description": "Collection of schedules"
+    },
+    "posts": {
+      "schema": "Post",
+      "description": "Collection of board posts"
+    }
+  }
+}
