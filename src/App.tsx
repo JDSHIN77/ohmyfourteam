@@ -95,6 +95,8 @@ export default function App() {
   const [schedules, setSchedules] = useState<Record<number, Record<string, { work: string, status: string, time: string }>>>({});
   
   const [personnelList, setPersonnelList] = useState<{ id: number, branch: string, name: string }[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [newBranch, setNewBranch] = useState('');
   const [newName, setNewName] = useState('');
 
@@ -369,10 +371,20 @@ export default function App() {
     };
   });
 
+  const filteredPersonnelList = personnelList.filter(person => 
+    person.branch.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    person.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const filteredPosts = posts.filter(post => {
     if (!post.date) return false;
     const [postYear, postMonth] = post.date.split('-');
-    return parseInt(postYear) === year && parseInt(postMonth) === month + 1;
+    const matchesMonth = parseInt(postYear) === year && parseInt(postMonth) === month + 1;
+    const matchesSearch = post.managerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         post.scheduledWorkplace.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         post.changedWorkplace.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         post.notes.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesMonth && matchesSearch;
   });
 
   return (
@@ -490,13 +502,37 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="지점 또는 이름 검색..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 lg:w-72 text-sm transition-all"
               />
             </div>
           </div>
           <div className="flex items-center space-x-2 md:hidden">
-            <button className="p-2 hover:bg-gray-100 rounded-lg">
-              <Search className="w-5 h-5 text-gray-500" />
+            <AnimatePresence>
+              {isSearchOpen && (
+                <motion.div 
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: '160px', opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  className="relative overflow-hidden"
+                >
+                  <input 
+                    type="text" 
+                    placeholder="검색..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    autoFocus
+                    className="w-full pl-3 pr-3 py-1.5 border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <button 
+              onClick={() => setIsSearchOpen(!isSearchOpen)}
+              className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${isSearchOpen ? 'bg-gray-100 text-blue-600' : 'text-gray-500'}`}
+            >
+              <Search className="w-5 h-5" />
             </button>
           </div>
         </header>
@@ -546,7 +582,7 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {personnelList.map((person) => {
+                        {filteredPersonnelList.map((person) => {
                           const personSchedule = schedules[person.id] || {};
                           return (
                           <tr key={person.id} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50/50 transition-colors">
@@ -556,7 +592,7 @@ export default function App() {
                             </td>
                             {currentMonthDates.map((date, dayIdx) => {
                               const dayData = personSchedule[date.dateString] || { work: '', status: '', time: '' };
-                              const isFullCoverStatus = dayData.status && dayData.status !== '상태' && dayData.status !== '겸직';
+                              const isFullCoverStatus = dayData.status && dayData.status !== '상태' && dayData.status !== '겸직' && dayData.status !== '반차' && dayData.status !== '반반차';
                               
                               return (
                               <td key={dayIdx} className={`p-1 border-r border-gray-200 last:border-r-0 align-top ${date.isRed ? 'bg-red-50/20' : date.isBlue ? 'bg-blue-50/20' : 'bg-white'}`}>
@@ -597,11 +633,11 @@ export default function App() {
                                           ))}
                                         </select>
                                       </div>
-                                      <div className={`w-1/2 h-full transition-colors ${dayData.status === '겸직' ? 'bg-blue-100' : ''}`}>
+                                      <div className={`w-1/2 h-full transition-colors ${['겸직', '반차', '반반차'].includes(dayData.status) ? 'bg-blue-100' : ''}`}>
                                         <select 
                                           value={dayData.status || '상태'} 
                                           onChange={(e) => handleStatusChange(person.id, date.dateString, e.target.value)}
-                                          className={`w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer hover:bg-black/5 appearance-none px-0 transition-colors ${dayData.status === '겸직' ? 'text-blue-700' : (!dayData.status || dayData.status === '상태') ? 'text-black/40' : 'text-gray-800'}`}
+                                          className={`w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer hover:bg-black/5 appearance-none px-0 transition-colors ${['겸직', '반차', '반반차'].includes(dayData.status) ? 'text-blue-700' : (!dayData.status || dayData.status === '상태') ? 'text-black/40' : 'text-gray-800'}`}
                                           style={{ textAlignLast: 'center' }}
                                         >
                                           {statusOptions.map(opt => (
@@ -616,6 +652,14 @@ export default function App() {
                             )})}
                           </tr>
                         )})}
+                        {filteredPersonnelList.length === 0 && (
+                          <tr>
+                            <td colSpan={currentMonthDates.length + 1} className="py-20 text-center text-gray-400 bg-white">
+                              <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                              <p>{searchTerm ? '검색 결과가 없습니다.' : '등록된 인원이 없습니다.'}</p>
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -672,7 +716,7 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody>
-                            {personnelList.map((person) => (
+                            {filteredPersonnelList.map((person) => (
                               <tr key={person.id} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50/30 transition-colors">
                                 <td className="py-4 px-6 font-bold text-gray-800">{person.branch}</td>
                                 <td className="py-4 px-6 text-gray-600">{person.name}</td>
@@ -700,11 +744,11 @@ export default function App() {
                                 </td>
                               </tr>
                             ))}
-                            {personnelList.length === 0 && (
+                            {filteredPersonnelList.length === 0 && (
                               <tr>
                                 <td colSpan={3} className="py-20 text-center text-gray-400">
                                   <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                  <p>등록된 인원이 없습니다.</p>
+                                  <p>{searchTerm ? '검색 결과가 없습니다.' : '등록된 인원이 없습니다.'}</p>
                                 </td>
                               </tr>
                             )}
@@ -841,7 +885,7 @@ export default function App() {
                           <tr>
                             <td colSpan={8} className="py-20 text-center text-gray-400">
                               <FileText className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                              <p>작성된 게시글이 없습니다.</p>
+                              <p>{searchTerm ? '검색 결과가 없습니다.' : '작성된 게시글이 없습니다.'}</p>
                             </td>
                           </tr>
                         )}
