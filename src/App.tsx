@@ -104,10 +104,15 @@ export default function App() {
   useEffect(() => {
     const testConnection = async () => {
       try {
+        // Use a simple getDoc to check connection
         await getDocFromServer(doc(db, 'test', 'connection'));
         setIsConnected(true);
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
+      } catch (error: any) {
+        console.error('Connection test failed:', error);
+        // If it's a permission error, we are still "connected" to the service
+        if (error.code === 'permission-denied') {
+          setIsConnected(true);
+        } else {
           setIsConnected(false);
         }
       }
@@ -195,6 +200,9 @@ export default function App() {
   const month = currentDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
   const currentMonthDates = Array.from({ length: daysInMonth }, (_, i) => {
     const d = new Date(year, month, i + 1);
     const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
@@ -202,6 +210,7 @@ export default function App() {
     const holidayName = holidays[dateString] || '';
     const isRed = weekdayIdx === 0 || !!holidayName;
     const isBlue = weekdayIdx === 6 && !isRed;
+    const isToday = dateString === todayString;
     
     return {
       day: i + 1,
@@ -209,7 +218,8 @@ export default function App() {
       dateString,
       holiday: holidayName,
       isRed,
-      isBlue
+      isBlue,
+      isToday
     };
   });
 
@@ -350,10 +360,30 @@ export default function App() {
 
     currentMonthDates.forEach(date => {
       const day = personSchedule[date.dateString] || { work: '', status: '', time: '' };
+      
+      // Check if it's a work day
+      // 1. Must have a work type assigned (and not just the default '근무' if it's considered "not entered")
+      // 2. Must NOT have a full-day off status
+      
+      const isOffStatus = ['주휴', '휴무', '대휴', '연차', '휴가', '경조'].includes(day.status);
+      const hasWorkType = day.work && day.work !== '' && day.work !== '근무';
+      const isGeneralWork = day.work === '근무';
+      const hasPartialOff = ['반차', '반반차'].includes(day.status);
+      const hasTime = day.time && day.time.trim() !== '';
+      
       if (day.work === '오픈' || day.work === '오_미단독') openCount++;
       if (day.work === '마감' || day.work === '마_미단독') closeCount++;
       if (day.status === '겸직') concurrentCount++;
-      if (day.work && day.work !== '휴무') workDays++;
+      
+      // A day is counted as a work day if:
+      // - It has a specific work type (오픈, 마감, 미들, 교육, 출장)
+      // - OR it has '근무' AND (it has time entered OR it's a concurrent/partial duty)
+      // - OR it has a partial off status (반차, 반반차)
+      const isActuallyWorking = hasWorkType || (isGeneralWork && (hasTime || day.status === '겸직')) || hasPartialOff;
+      
+      if (isActuallyWorking && !isOffStatus) {
+        workDays++;
+      }
     });
 
     const openRatio = workDays > 0 ? Math.round((openCount / workDays) * 100) : 0;
@@ -564,11 +594,11 @@ export default function App() {
                     <table className="w-full min-w-[1000px] border-collapse">
                       <thead>
                         <tr>
-                          <th className="sticky top-0 left-0 z-30 w-24 py-2 px-2 border-b border-r border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 align-middle shadow-[1px_1px_0_0_rgba(0,0,0,0.1)]">
+                          <th className="sticky top-0 left-0 z-30 w-24 py-2 px-2 border-b border-r border-gray-200/50 bg-gray-50 text-xs font-medium text-gray-500 align-middle shadow-[1px_1px_0_0_rgba(0,0,0,0.1)]">
                             지점 / 이름
                           </th>
                           {currentMonthDates.map((date, idx) => (
-                            <th key={idx} className={`sticky top-0 z-20 min-w-[80px] py-1.5 px-1 border-b border-r border-gray-200 text-center align-middle last:border-r-0 ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'} shadow-[0_1px_0_0_rgba(0,0,0,0.1)]`}>
+                            <th key={idx} className={`sticky top-0 z-20 min-w-[80px] py-1.5 px-1 border-b border-gray-200/50 text-center align-middle last:border-r-0 ${date.isToday ? 'border-t-2 border-x-2 border-gray-500/60 border-b-0' : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'} shadow-[0_1px_0_0_rgba(0,0,0,0.1)]`}>
                               <div className="flex flex-col items-center justify-center h-full">
                                 <div className={`text-[13px] font-bold ${date.isRed ? 'text-red-600' : date.isBlue ? 'text-blue-600' : 'text-gray-800'}`}>
                                   {date.day}일({date.weekday})
@@ -582,11 +612,12 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredPersonnelList.map((person) => {
+                        {filteredPersonnelList.map((person, personIdx) => {
                           const personSchedule = schedules[person.id] || {};
+                          const isLastRow = personIdx === filteredPersonnelList.length - 1;
                           return (
-                          <tr key={person.id} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50/50 transition-colors">
-                            <td className="sticky left-0 z-10 py-1.5 px-2 border-r border-gray-200 text-center align-middle bg-white whitespace-nowrap shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
+                          <tr key={person.id} className="border-b border-gray-200/50 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+                            <td className="sticky left-0 z-10 py-1.5 px-2 border-r border-gray-200/50 text-center align-middle bg-white whitespace-nowrap shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
                               <div className="font-bold text-gray-800 text-[13px] leading-tight">{person.branch}</div>
                               <div className="text-[12px] text-gray-500 leading-tight">{person.name}</div>
                             </td>
@@ -595,9 +626,9 @@ export default function App() {
                               const isFullCoverStatus = dayData.status && dayData.status !== '상태' && dayData.status !== '겸직' && dayData.status !== '반차' && dayData.status !== '반반차';
                               
                               return (
-                              <td key={dayIdx} className={`p-1 border-r border-gray-200 last:border-r-0 align-top ${date.isRed ? 'bg-red-50/20' : date.isBlue ? 'bg-blue-50/20' : 'bg-white'}`}>
+                              <td key={dayIdx} className={`p-1 last:border-r-0 align-top ${date.isToday ? `border-x-2 border-gray-500/60 ${isLastRow ? 'border-b-2' : ''}` : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'}`}>
                                 {isFullCoverStatus ? (
-                                  <div className="h-[56px] border border-gray-200 rounded text-center font-bold text-[13px] overflow-hidden bg-gray-50 flex items-center justify-center">
+                                  <div className="h-[56px] border border-gray-200/60 rounded text-center font-bold text-[13px] overflow-hidden bg-black/5 flex items-center justify-center">
                                     <select 
                                       value={dayData.status} 
                                       onChange={(e) => handleStatusChange(person.id, date.dateString, e.target.value)}
@@ -611,17 +642,17 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div className="flex flex-col gap-1">
-                                    <div className={`h-[26px] border rounded text-center font-bold text-[13px] overflow-hidden bg-white ${dayData.time ? 'border-gray-300 text-gray-800' : 'border-gray-200 text-gray-300'}`}>
+                                    <div className={`h-[26px] border rounded text-center font-bold text-[13px] overflow-hidden ${dayData.time ? 'bg-white/80 border-gray-300 text-gray-800' : 'bg-white/40 border-gray-200 text-gray-300'}`}>
                                       <input
                                         type="text"
                                         value={dayData.time}
                                         placeholder="00:00"
                                         onChange={(e) => handleTimeChange(person.id, date.dateString, e.target.value)}
-                                        className="w-full h-full text-center bg-transparent outline-none focus:bg-blue-50 focus:text-blue-700 transition-colors placeholder:text-gray-300"
+                                        className="w-full h-full text-center bg-transparent outline-none focus:bg-blue-50/50 focus:text-blue-700 transition-colors placeholder:text-gray-300"
                                       />
                                     </div>
-                                    <div className="h-[26px] flex text-[12px] text-center items-center bg-white rounded border border-gray-200 overflow-hidden">
-                                      <div className={`w-1/2 h-full border-r border-gray-200 transition-colors ${dayData.work === '오픈' ? 'bg-green-100' : dayData.work === '마감' ? 'bg-red-100' : ''}`}>
+                                    <div className="h-[26px] flex text-[12px] text-center items-center bg-white/60 rounded border border-gray-200/60 overflow-hidden">
+                                      <div className={`w-1/2 h-full border-r border-gray-200/60 transition-colors ${dayData.work === '오픈' ? 'bg-green-100/70' : dayData.work === '마감' ? 'bg-red-100/70' : ''}`}>
                                         <select 
                                           value={dayData.work || '근무'} 
                                           onChange={(e) => handleWorkChange(person.id, date.dateString, e.target.value)}
