@@ -616,7 +616,7 @@ export default function App() {
                           const personSchedule = schedules[person.id] || {};
                           const isLastRow = personIdx === filteredPersonnelList.length - 1;
                           return (
-                          <tr key={person.id} className="border-b border-gray-200/50 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+                          <tr key={person.id} className="border-b border-gray-400/50 last:border-b-0 hover:bg-gray-50/50 transition-colors">
                             <td className="sticky left-0 z-10 py-1.5 px-2 border-r border-gray-200/50 text-center align-middle bg-white whitespace-nowrap shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
                               <div className="font-bold text-gray-800 text-[13px] leading-tight">{person.branch}</div>
                               <div className="text-[12px] text-gray-500 leading-tight">{person.name}</div>
