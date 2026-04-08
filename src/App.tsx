@@ -594,11 +594,11 @@ export default function App() {
                     <table className="w-full min-w-[1000px] border-collapse">
                       <thead>
                         <tr>
-                          <th className="sticky top-0 left-0 z-30 w-24 py-2 px-2 border-b border-r border-gray-200/50 bg-gray-50 text-xs font-medium text-gray-500 align-middle shadow-[1px_1px_0_0_rgba(0,0,0,0.1)]">
+                          <th className="sticky top-0 left-0 z-30 w-24 py-2 px-2 border-b-2 border-r border-gray-400/40 bg-gray-50 text-xs font-medium text-gray-500 align-middle shadow-[1px_1px_0_0_rgba(0,0,0,0.1)]">
                             지점 / 이름
                           </th>
                           {currentMonthDates.map((date, idx) => (
-                            <th key={idx} className={`sticky top-0 z-20 min-w-[80px] py-1.5 px-1 border-b border-gray-200/50 text-center align-middle last:border-r-0 ${date.isToday ? 'border-t-2 border-x-2 border-gray-500/60 border-b-0' : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'} shadow-[0_1px_0_0_rgba(0,0,0,0.1)]`}>
+                            <th key={idx} className={`sticky top-0 z-20 min-w-[80px] py-1.5 px-1 border-b-2 border-gray-400/40 text-center align-middle last:border-r-0 ${date.isToday ? 'border-t-2 border-x-2 border-red-500 border-b-gray-400/40' : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'} shadow-[0_1px_0_0_rgba(0,0,0,0.1)]`}>
                               <div className="flex flex-col items-center justify-center h-full">
                                 <div className={`text-[13px] font-bold ${date.isRed ? 'text-red-600' : date.isBlue ? 'text-blue-600' : 'text-gray-800'}`}>
                                   {date.day}일({date.weekday})
@@ -625,14 +625,31 @@ export default function App() {
                               const dayData = personSchedule[date.dateString] || { work: '', status: '', time: '' };
                               const isFullCoverStatus = dayData.status && dayData.status !== '상태' && dayData.status !== '겸직' && dayData.status !== '반차' && dayData.status !== '반반차';
                               
+                              const getStatusColor = (status: string) => {
+                                switch (status) {
+                                  case '주휴': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                                  case '휴무': return 'bg-red-100 text-red-800 border-red-200';
+                                  case '대휴': return 'bg-purple-100 text-purple-800 border-purple-200';
+                                  case '연차': return 'bg-orange-100 text-orange-800 border-orange-200';
+                                  case '휴가': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                                  case '경조': return 'bg-pink-100 text-pink-800 border-pink-200';
+                                  case '겸직':
+                                  case '반차':
+                                  case '반반차': return 'bg-blue-50 text-blue-700 border-blue-100';
+                                  default: return 'bg-transparent border-gray-200/60';
+                                }
+                              };
+
+                              const statusColorClass = getStatusColor(dayData.status);
+                              
                               return (
-                              <td key={dayIdx} className={`p-1 last:border-r-0 align-top ${date.isToday ? `border-x-2 border-gray-500/60 ${isLastRow ? 'border-b-2' : ''}` : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'}`}>
+                              <td key={dayIdx} className={`p-1 last:border-r-0 align-top ${date.isToday ? `border-x-2 border-red-500 ${isLastRow ? 'border-b-2' : ''}` : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'}`}>
                                 {isFullCoverStatus ? (
-                                  <div className="h-[56px] border border-gray-200/60 rounded text-center font-bold text-[13px] overflow-hidden bg-black/5 flex items-center justify-center">
+                                  <div className={`h-[56px] border rounded text-center font-bold overflow-hidden flex items-center justify-center ${statusColorClass} ${dayData.status.length > 4 ? 'text-[11px]' : 'text-[13px]'}`}>
                                     <select 
                                       value={dayData.status} 
                                       onChange={(e) => handleStatusChange(person.id, date.dateString, e.target.value)}
-                                      className="w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer hover:bg-gray-100 appearance-none px-0 text-gray-800"
+                                      className="w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer appearance-none px-0"
                                       style={{ textAlignLast: 'center' }}
                                     >
                                       {statusOptions.map(opt => (
@@ -651,28 +668,28 @@ export default function App() {
                                         className="w-full h-full text-center bg-transparent outline-none focus:bg-blue-50/50 focus:text-blue-700 transition-colors placeholder:text-gray-300"
                                       />
                                     </div>
-                                    <div className="h-[26px] flex text-[12px] text-center items-center bg-white/60 rounded border border-gray-200/60 overflow-hidden">
+                                    <div className="h-[26px] flex text-center items-center bg-white/60 rounded border border-gray-200/60 overflow-hidden">
                                       <div className={`w-1/2 h-full border-r border-gray-200/60 transition-colors ${dayData.work === '오픈' ? 'bg-green-100/70' : dayData.work === '마감' ? 'bg-red-100/70' : ''}`}>
                                         <select 
                                           value={dayData.work || '근무'} 
                                           onChange={(e) => handleWorkChange(person.id, date.dateString, e.target.value)}
-                                          className={`w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer hover:bg-black/5 appearance-none px-0 transition-colors ${dayData.work === '오픈' ? 'text-green-700' : dayData.work === '마감' ? 'text-red-700' : (!dayData.work || dayData.work === '근무') ? 'text-black/40' : 'text-gray-800'}`}
+                                          className={`w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer hover:bg-black/5 appearance-none px-0 transition-colors ${dayData.work === '오픈' ? 'text-green-700' : dayData.work === '마감' ? 'text-red-700' : (!dayData.work || dayData.work === '근무') ? 'text-gray-300' : 'text-gray-800'} ${(dayData.work?.length || 0) > 3 ? 'text-[10px]' : 'text-[12px]'}`}
                                           style={{ textAlignLast: 'center' }}
                                         >
                                           {workOptions.map(opt => (
-                                            <option key={opt} value={opt} className="text-gray-800 font-bold bg-white">{opt}</option>
+                                            <option key={opt} value={opt} className="text-gray-800 font-bold bg-white text-[12px]">{opt}</option>
                                           ))}
                                         </select>
                                       </div>
-                                      <div className={`w-1/2 h-full transition-colors ${['겸직', '반차', '반반차'].includes(dayData.status) ? 'bg-blue-100' : ''}`}>
+                                      <div className={`w-1/2 h-full transition-colors ${statusColorClass} border-l border-gray-200/60`}>
                                         <select 
                                           value={dayData.status || '상태'} 
                                           onChange={(e) => handleStatusChange(person.id, date.dateString, e.target.value)}
-                                          className={`w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer hover:bg-black/5 appearance-none px-0 transition-colors ${['겸직', '반차', '반반차'].includes(dayData.status) ? 'text-blue-700' : (!dayData.status || dayData.status === '상태') ? 'text-black/40' : 'text-gray-800'}`}
+                                          className={`w-full h-full bg-transparent text-center font-bold outline-none cursor-pointer hover:bg-black/5 appearance-none px-0 transition-colors ${(!dayData.status || dayData.status === '상태') ? 'text-gray-300' : ''} ${(dayData.status?.length || 0) > 3 ? 'text-[10px]' : 'text-[12px]'}`}
                                           style={{ textAlignLast: 'center' }}
                                         >
                                           {statusOptions.map(opt => (
-                                            <option key={opt} value={opt} className="text-gray-800 font-bold bg-white">{opt}</option>
+                                            <option key={opt} value={opt} className="text-gray-800 font-bold bg-white text-[12px]">{opt}</option>
                                           ))}
                                         </select>
                                       </div>
