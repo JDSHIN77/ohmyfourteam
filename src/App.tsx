@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, BarChart2, Users, ChevronLeft, ChevronRight, Search, Plus, User, Pencil, Trash2, FileText, X, Wifi, WifiOff, Menu, MapPin, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from './firebase';
@@ -99,6 +99,18 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [newBranch, setNewBranch] = useState('');
   const [newName, setNewName] = useState('');
+  const todayRef = useRef<HTMLTableHeaderCellElement | null>(null);
+
+  // Scroll to today on initial load or when switching to schedule tab
+  useEffect(() => {
+    if (activeTab === 'schedule' && todayRef.current) {
+      // Small delay to ensure table is fully rendered
+      const timer = setTimeout(() => {
+        todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, personnelList.length > 0]);
 
   // Sync with Firestore
   useEffect(() => {
@@ -183,6 +195,7 @@ export default function App() {
     createdAt: string;
   }[]>([]);
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<any | null>(null);
   const [newPost, setNewPost] = useState({
     managerName: '',
     date: '',
@@ -339,6 +352,40 @@ export default function App() {
       setIsWriteModalOpen(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `posts/${newId}`);
+    }
+  };
+
+  const openPostEditModal = (post: any) => {
+    setEditingPost({ ...post });
+    setNewPost({
+      managerName: post.managerName,
+      date: post.date,
+      scheduledWorkplace: post.scheduledWorkplace,
+      changedWorkplace: post.changedWorkplace,
+      supportTime: post.supportTime,
+      notes: post.notes
+    });
+    setIsWriteModalOpen(true);
+  };
+
+  const handleUpdatePost = async () => {
+    if (!editingPost || !newPost.managerName.trim() || !newPost.date.trim()) return;
+    const updatedPost = { ...editingPost, ...newPost };
+    
+    try {
+      await setDoc(doc(db, 'posts', editingPost.id.toString()), updatedPost);
+      setNewPost({
+        managerName: '',
+        date: '',
+        scheduledWorkplace: '',
+        changedWorkplace: '',
+        supportTime: '',
+        notes: ''
+      });
+      setEditingPost(null);
+      setIsWriteModalOpen(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `posts/${editingPost.id}`);
     }
   };
 
@@ -598,7 +645,11 @@ export default function App() {
                             지점 / 이름
                           </th>
                           {currentMonthDates.map((date, idx) => (
-                            <th key={idx} className={`sticky top-0 z-20 min-w-[80px] py-1.5 px-1 border-b-2 border-gray-400/40 text-center align-middle last:border-r-0 ${date.isToday ? 'border-t-2 border-x-2 border-red-500 border-b-gray-400/40' : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'} shadow-[0_1px_0_0_rgba(0,0,0,0.1)]`}>
+                            <th 
+                              key={idx} 
+                              ref={date.isToday ? todayRef : null}
+                              className={`sticky top-0 z-20 min-w-[80px] py-1.5 px-1 border-b-2 border-gray-400/40 text-center align-middle last:border-r-0 ${date.isToday ? 'border-t-2 border-x-2 border-red-500 border-b-gray-400/40' : `border-r ${date.weekday === '수' ? 'border-r-2 border-r-gray-400/30' : 'border-r-gray-200/50'}`} ${date.isRed ? 'bg-red-50' : date.isBlue ? 'bg-blue-50' : 'bg-white'} shadow-[0_1px_0_0_rgba(0,0,0,0.1)]`}
+                            >
                               <div className="flex flex-col items-center justify-center h-full">
                                 <div className={`text-[13px] font-bold ${date.isRed ? 'text-red-600' : date.isBlue ? 'text-blue-600' : 'text-gray-800'}`}>
                                   {date.day}일({date.weekday})
@@ -895,40 +946,60 @@ export default function App() {
                     <table className="w-full min-w-[1000px] border-collapse">
                       <thead>
                         <tr>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-center w-24">작성일</th>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-center w-24">점장명</th>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-center w-24">일자</th>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-center w-32">스케줄상 근무지</th>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-center w-40">변경 근무지</th>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-center w-24">지원 시간</th>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-left">기타</th>
-                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-xs font-medium text-gray-500 text-center w-16">관리</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center w-24">작성일</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center w-24">점장명</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center w-24">일자</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center w-32">스케줄상<br/>근무지</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center w-32">변경<br/>근무지</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center w-24">지원 시간</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center">내용</th>
+                          <th className="py-4 px-4 border-b border-gray-200 bg-gray-50/50 text-sm font-bold text-gray-500 text-center w-28">관리</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredPosts.map((post) => (
+                        {filteredPosts.map((post) => {
+                          const formatDate = (dateStr: string) => {
+                            const d = new Date(dateStr);
+                            if (isNaN(d.getTime())) return dateStr;
+                            const yy = String(d.getFullYear()).slice(2);
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            return `${yy}.${mm}.${dd}`;
+                          };
+                          
+                          return (
                           <tr key={post.id} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50/30 transition-colors">
-                            <td className="py-4 px-4 text-center text-xs text-gray-500">{new Date(post.createdAt).toLocaleDateString()}</td>
+                            <td className="py-4 px-4 text-center text-sm text-gray-500">{formatDate(post.createdAt)}</td>
                             <td className="py-4 px-4 text-center font-bold text-gray-800 text-sm">{post.managerName}</td>
-                            <td className="py-4 px-4 text-center text-sm font-medium">{post.date}</td>
+                            <td className="py-4 px-4 text-center text-sm font-medium">{formatDate(post.date)}</td>
                             <td className="py-4 px-4 text-center text-sm">{post.scheduledWorkplace}</td>
                             <td className="py-4 px-4 text-center">
-                              <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-bold">{post.changedWorkplace}</span>
+                              <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-bold">{post.changedWorkplace}</span>
                             </td>
                             <td className="py-4 px-4 text-center text-sm font-bold text-gray-700">{post.supportTime}</td>
-                            <td className="py-4 px-4 text-sm text-gray-600">{post.notes}</td>
+                            <td className="py-4 px-4 text-center text-sm text-gray-600">{post.notes}</td>
                             <td className="py-4 px-4 text-center">
-                              <motion.button 
-                                whileHover={{ scale: 1.1, color: '#ef4444' }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => deletePost(post.id)}
-                                className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </motion.button>
+                              <div className="flex items-center justify-center space-x-1">
+                                <motion.button 
+                                  whileHover={{ scale: 1.1, color: '#3b82f6' }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => openPostEditModal(post)}
+                                  className="p-2 text-gray-300 hover:text-blue-500 transition-colors"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </motion.button>
+                                <motion.button 
+                                  whileHover={{ scale: 1.1, color: '#ef4444' }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => deletePost(post.id)}
+                                  className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </motion.button>
+                              </div>
                             </td>
                           </tr>
-                        ))}
+                        );})}
                         {filteredPosts.length === 0 && (
                           <tr>
                             <td colSpan={8} className="py-20 text-center text-gray-400">
@@ -1078,7 +1149,18 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsWriteModalOpen(false)}
+              onClick={() => {
+                setIsWriteModalOpen(false);
+                setEditingPost(null);
+                setNewPost({
+                  managerName: '',
+                  date: '',
+                  scheduledWorkplace: '',
+                  changedWorkplace: '',
+                  supportTime: '',
+                  notes: ''
+                });
+              }}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
@@ -1088,8 +1170,19 @@ export default function App() {
               className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden relative z-10 flex flex-col max-h-[90vh]"
             >
               <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h3 className="text-xl font-bold text-gray-900 tracking-tight">근무지원 작성</h3>
-                <button onClick={() => setIsWriteModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                <h3 className="text-xl font-bold text-gray-900 tracking-tight">{editingPost ? '근무지원 수정' : '근무지원 작성'}</h3>
+                <button onClick={() => {
+                  setIsWriteModalOpen(false);
+                  setEditingPost(null);
+                  setNewPost({
+                    managerName: '',
+                    date: '',
+                    scheduledWorkplace: '',
+                    changedWorkplace: '',
+                    supportTime: '',
+                    notes: ''
+                  });
+                }} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
@@ -1161,12 +1254,12 @@ export default function App() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold text-gray-700">기타 전달사항</label>
+                  <label className="block text-sm font-bold text-gray-700">내용</label>
                   <textarea 
                     value={newPost.notes}
                     onChange={(e) => setNewPost({ ...newPost, notes: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm min-h-[120px] resize-none"
-                    placeholder="추가 전달사항을 상세히 입력하세요"
+                    placeholder="내용을 상세히 입력하세요"
                   />
                 </div>
             </div>
@@ -1174,7 +1267,18 @@ export default function App() {
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => setIsWriteModalOpen(false)}
+                  onClick={() => {
+                    setIsWriteModalOpen(false);
+                    setEditingPost(null);
+                    setNewPost({
+                      managerName: '',
+                      date: '',
+                      scheduledWorkplace: '',
+                      changedWorkplace: '',
+                      supportTime: '',
+                      notes: ''
+                    });
+                  }}
                   className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
                 >
                   취소
@@ -1182,11 +1286,11 @@ export default function App() {
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={handleAddPost}
+                  onClick={editingPost ? handleUpdatePost : handleAddPost}
                   disabled={!newPost.managerName.trim() || !newPost.date.trim()}
                   className="px-5 py-2.5 text-sm font-bold text-white bg-black rounded-xl hover:bg-gray-800 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  게시글 등록
+                  {editingPost ? '수정 완료' : '게시글 등록'}
                 </motion.button>
               </div>
             </motion.div>
