@@ -101,16 +101,34 @@ export default function App() {
   const [newName, setNewName] = useState('');
   const todayRef = useRef<HTMLTableHeaderCellElement | null>(null);
 
-  // Scroll to today on initial load or when switching to schedule tab
+  // Scroll to today whenever the schedule tab is accessed
   useEffect(() => {
-    if (activeTab === 'schedule' && todayRef.current) {
-      // Small delay to ensure table is fully rendered
-      const timer = setTimeout(() => {
-        todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }, 500);
-      return () => clearTimeout(timer);
+    if (activeTab === 'schedule') {
+      const performScroll = () => {
+        if (todayRef.current) {
+          todayRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest', 
+            inline: 'center' 
+          });
+          return true;
+        }
+        return false;
+      };
+
+      // Try scrolling with a few attempts to ensure the DOM and layout are ready
+      let attempts = 0;
+      const scrollInterval = setInterval(() => {
+        attempts++;
+        const success = performScroll();
+        if (success || attempts >= 10) {
+          clearInterval(scrollInterval);
+        }
+      }, 150);
+
+      return () => clearInterval(scrollInterval);
     }
-  }, [activeTab, personnelList.length > 0]);
+  }, [activeTab, personnelList.length]);
 
   // Sync with Firestore
   useEffect(() => {
@@ -508,7 +526,10 @@ export default function App() {
               <motion.button 
                 whileHover={{ x: 4 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => { setActiveTab('schedule'); setIsMobileMenuOpen(false); }}
+                onClick={() => { 
+                  setActiveTab('schedule'); 
+                  setIsMobileMenuOpen(false);
+                }}
                 className={`w-full flex items-center px-6 py-3 rounded-r-xl mx-2 transition-colors ${activeTab === 'schedule' ? 'bg-black text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
               >
                 <Calendar className="w-5 h-5 mr-3" />
